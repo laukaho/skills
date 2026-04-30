@@ -1,5 +1,5 @@
 ---
-description: Break a plan, spec, or PRD into independently-grabbable GitHub issues using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementation tickets, or break down work into issues.
+description: Break a plan, spec, or PRD into independently-grabbable issues using tracer-bullet vertical slices. Outputs to GitHub issues (default) or local markdown files. Use when user wants to convert a plan into issues, create implementation tickets, or break down work into issues.
 metadata:
     github-path: skills/engineering/to-issues
     github-ref: refs/heads/main
@@ -9,7 +9,13 @@ name: to-issues
 ---
 # To Issues
 
-Break a plan into independently-grabbable GitHub issues using vertical slices (tracer bullets).
+Break a plan into independently-grabbable issues using vertical slices (tracer bullets).
+
+## Mode Detection
+
+Before proceeding, detect the mode:
+- **Local mode**: If `./issues/open/` directory exists (or user explicitly requests local), create local markdown files
+- **GitHub mode** (default): If `./issues/open/` does NOT exist, create GitHub issues
 
 ## Process
 
@@ -51,13 +57,15 @@ Ask the user:
 
 Iterate until the user approves the breakdown.
 
-### 5. Create the GitHub issues
+### 5. Create issues
+
+#### If GitHub mode (default)
 
 For each approved slice, create a GitHub issue using `gh issue create`. Use the issue body template below.
 
 Create issues in dependency order (blockers first) so you can reference real issue numbers in the "Blocked by" field.
 
-<issue-template>
+<github-issue-template>
 ## Parent
 
 #<parent-issue-number> (if the source was a GitHub issue, otherwise omit this section)
@@ -77,7 +85,32 @@ A concise description of this vertical slice. Describe the end-to-end behavior, 
 - Blocked by #<issue-number> (if any)
 
 Or "None - can start immediately" if no blockers.
+</github-issue-template>
 
-</issue-template>
+#### If Local mode
+
+For each approved slice, create a markdown file in `./issues/open/` using the filename format `###-<kebab-case-title>.md` (use 3-digit numbers with leading zeros: `001`, `002`, etc.). Use the issue body template below.
+
+Ensure the directory exists first.
+
+Create issues in dependency order (blockers first) so you can reference real filenames in the "Blocked by" field.
+
+<local-issue-template>
+# <Issue Title>
+
+Parent PRD: <parent-prd-filename> (if applicable)
+
+Blocked by: #<issue-number-or-filename> (if any)
+
+## What to build
+
+A concise description of this vertical slice. Describe the end-to-end behavior, not layer-by-layer implementation.
+
+## Acceptance criteria
+
+- [ ] Criterion 1
+- [ ] Criterion 2
+- [ ] Criterion 3
+</local-issue-template>
 
 Do NOT close or modify any parent issue.

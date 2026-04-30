@@ -1,5 +1,5 @@
 ---
-description: Turn the current conversation context into a PRD and submit it as a GitHub issue. Use when user wants to create a PRD from the current context.
+description: Turn the current conversation context into a PRD and save it as a GitHub issue or local markdown file. Use when user wants to create a PRD from the current context.
 metadata:
     github-path: skills/engineering/to-prd
     github-ref: refs/heads/main
@@ -8,6 +8,12 @@ metadata:
 name: to-prd
 ---
 This skill takes the current conversation context and codebase understanding and produces a PRD. Do NOT interview the user — just synthesize what you already know.
+
+## Mode Detection
+
+Before proceeding, detect the mode:
+- **Local mode**: If `./prd/` directory exists (or user explicitly requests local), write the PRD to a local markdown file
+- **GitHub mode** (default): If `./prd/` does NOT exist, create a GitHub issue
 
 ## Process
 
@@ -19,7 +25,13 @@ A deep module (as opposed to a shallow module) is one which encapsulates a lot o
 
 Check with the user that these modules match their expectations. Check with the user which modules they want tests written for.
 
-3. Write the PRD using the template below and submit it as a GitHub issue.
+3. Write the PRD using the template below.
+
+### If GitHub mode (default)
+Submit the PRD as a GitHub issue using `gh issue create`.
+
+### If Local mode
+Save the PRD to `./prd/<kebab-case-title>.md`. Ensure the directory exists first.
 
 <prd-template>
 
