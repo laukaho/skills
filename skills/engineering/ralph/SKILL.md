@@ -7,6 +7,8 @@ description: Orchestrate automated issue processing with AI agents (opencode or 
 
 ## Quick start
 
+The shell scripts are bundled with this skill, located in the `scripts/` directory next to this SKILL.md file. Copy them to your repo or run them directly from the skill path.
+
 **GitHub mode** (issues stored in GitHub):
 ```bash
 ./scripts/ralph.sh <parent-issue-number>
@@ -48,12 +50,16 @@ The login button is not clickable on mobile.
 ```
 
 Ralph will:
-1. Find the first unblocked open issue for that PRD
-2. Move it to `issues/in-progress/`
-3. Create a branch `ralph/<issue-name>`
-4. Run the configured AI agent with the issue context
-5. Push commits and return to original branch
-6. Move issue to `issues/done/` or `issues/failed/`
+1. Create (or checkout) a PRD branch: `ralph/prd-<identifier>` from the current branch
+2. Find the first unblocked open issue for that PRD
+3. Move it to `issues/in-progress/`
+4. Create an issue branch from the PRD branch: `ralph/<issue-name>`
+5. Run the configured AI agent with the issue context
+6. Merge the issue branch back into the PRD branch
+7. Push the PRD branch and return to the original branch
+8. Move issue to `issues/done/` or `issues/failed/`
+
+For GitHub mode, ralph automatically creates the labels `ralph-in-progress`, `ralph-done`, and `ralph-failed` if they don't already exist in the repo.
 
 ### 3. Process all issues
 
@@ -91,4 +97,5 @@ Local issues are markdown files with these conventions:
 - Auto-detects mode: local if `issues/open/` exists, GitHub otherwise
 - Skips blocked issues until their dependencies are done
 - Prevents duplicate branches (`ralph/<issue-name>`)
-- Labels GitHub issues with `ralph-in-progress`, `ralph-done`, `ralph-failed`
+- Labels GitHub issues with `ralph-in-progress`, `ralph-done`, `ralph-failed` (auto-creates labels if missing)
+- **Branching strategy**: Creates a PRD branch first (`ralph/prd-<identifier>`), then branches issues from it. Issue branches are merged back into the PRD branch after completion.

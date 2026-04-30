@@ -9,6 +9,13 @@ usage() {
     echo ""
     echo "Processes the next available unblocked child issue for the given PRD."
     echo ""
+    echo "Branching strategy:"
+    echo "  1. Creates PRD branch: ralph/prd-<identifier> from current branch"
+    echo "  2. Creates issue branch from PRD branch"
+    echo "  3. Runs AI agent on issue branch"
+    echo "  4. Merges issue branch back into PRD branch"
+    echo "  5. Pushes PRD branch and returns to original branch"
+    echo ""
     echo "Examples:"
     echo "  $0 prd/001-auth.md          # Local mode"
     echo "  $0 42                        # GitHub mode"
@@ -27,15 +34,23 @@ main() {
     local mode
     mode=$(detect_mode)
     
+    local original_branch
+    original_branch=$(get_original_branch)
+    
+    local prd_branch
+    prd_branch=$(get_prd_branch_name "$target")
+    
+    # Ensure PRD branch exists
+    ensure_prd_branch "$prd_branch" "$original_branch"
+    
     if [[ "$mode" == "local" ]]; then
         if [[ ! -f "$target" ]]; then
             log_error "PRD file not found: $target"
             exit 1
         fi
         
-        if ! process_next_issue_local "$target"; then
+        if ! process_next_issue_local "$target" "$prd_branch" "$original_branch"; then
             log_info "No available issues to process"
-            exit 0
         fi
     elif [[ "$mode" == "github" ]]; then
         check_github_prerequisites
@@ -45,9 +60,8 @@ main() {
             exit 1
         fi
         
-        if ! process_next_issue_github "$target"; then
+        if ! process_next_issue_github "$target" "$prd_branch" "$original_branch"; then
             log_info "No available issues to process"
-            exit 0
         fi
     else
         log_error "Cannot detect mode. Ensure either:"
@@ -55,6 +69,9 @@ main() {
         log_error "  - GitHub: gh CLI is installed and authenticated"
         exit 1
     fi
+    
+    # Cleanup: push PRD branch and return to original
+    cleanup_prd_branch "$prd_branch" "$original_branch"
 }
 
 main "$@"

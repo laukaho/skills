@@ -9,6 +9,12 @@ usage() {
     echo ""
     echo "Processes all available unblocked child issues until none remain."
     echo ""
+    echo "Branching strategy:"
+    echo "  1. Creates PRD branch: ralph/prd-<identifier> from current branch"
+    echo "  2. For each issue, creates branch from PRD branch"
+    echo "  3. Runs AI agent and merges back into PRD branch"
+    echo "  4. Pushes PRD branch and returns to original branch"
+    echo ""
     echo "Examples:"
     echo "  $0 prd/001-auth.md          # Local mode"
     echo "  $0 42                        # GitHub mode"
@@ -27,6 +33,15 @@ main() {
     local mode
     mode=$(detect_mode)
     
+    local original_branch
+    original_branch=$(get_original_branch)
+    
+    local prd_branch
+    prd_branch=$(get_prd_branch_name "$target")
+    
+    # Ensure PRD branch exists
+    ensure_prd_branch "$prd_branch" "$original_branch"
+    
     if [[ "$mode" == "local" ]]; then
         if [[ ! -f "$target" ]]; then
             log_error "PRD file not found: $target"
@@ -34,7 +49,7 @@ main() {
         fi
         
         while true; do
-            if ! process_next_issue_local "$target"; then
+            if ! process_next_issue_local "$target" "$prd_branch" "$original_branch"; then
                 log_info "No more available issues to process"
                 break
             fi
@@ -48,7 +63,7 @@ main() {
         fi
         
         while true; do
-            if ! process_next_issue_github "$target"; then
+            if ! process_next_issue_github "$target" "$prd_branch" "$original_branch"; then
                 log_info "No more available issues to process"
                 break
             fi
@@ -59,6 +74,9 @@ main() {
         log_error "  - GitHub: gh CLI is installed and authenticated"
         exit 1
     fi
+    
+    # Cleanup: push PRD branch and return to original
+    cleanup_prd_branch "$prd_branch" "$original_branch"
 }
 
 main "$@"

@@ -63,6 +63,109 @@ detect_mode() {
     fi
 }
 
+# --- PRD Branch Management ---
+
+get_prd_branch_name() {
+    local prd_ref="$1"
+    
+    if [[ "$prd_ref" =~ ^[0-9]+$ ]]; then
+        echo "ralph/prd-${prd_ref}"
+    else
+        local prd_basename
+        prd_basename=$(basename "$prd_ref" .md)
+        echo "ralph/prd-${prd_basename}"
+    fi
+}
+
+ensure_prd_branch() {
+    local prd_branch="$1"
+    local original_branch="$2"
+    
+    log_info "Ensuring PRD branch $prd_branch..."
+    
+    if git show-ref --verify --quiet "refs/heads/$prd_branch"; then
+        log_info "PRD branch $prd_branch already exists, checking it out..."
+        git checkout "$prd_branch"
+    else
+        log_info "Creating PRD branch $prd_branch from $original_branch..."
+        git checkout -b "$prd_branch" "$original_branch"
+    fi
+    
+    echo "$prd_branch"
+}
+
+cleanup_prd_branch() {
+    local prd_branch="$1"
+    local original_branch="$2"
+    
+    log_info "Cleaning up PRD branch $prd_branch..."
+    
+    if git rev-list --count "${original_branch}..${prd_branch}" | grep -q "^[1-9]"; then
+        log_info "Pushing PRD branch $prd_branch..."
+        git push -u origin "$prd_branch" || log_warn "Failed to push PRD branch"
+    else
+        log_info "No commits on $prd_branch. Skipping push."
+    fi
+    
+    git checkout "$original_branch"
+}
+
+# --- Issue Branch Management ---
+
+create_issue_branch() {
+    local branch_name="$1"
+    local prd_branch="$2"
+    
+    if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+        log_warn "Branch $branch_name already exists. Skipping."
+        return 1
+    fi
+    
+    git checkout -b "$branch_name" "$prd_branch"
+    echo "$branch_name"
+}
+
+merge_issue_to_prd() {
+    local issue_branch="$1"
+    local prd_branch="$2"
+    
+    log_info "Merging $issue_branch into $prd_branch..."
+    
+    git checkout "$prd_branch"
+    
+    if ! git merge --no-edit "$issue_branch" 2>/dev/null; then
+        log_warn "Merge conflict when merging $issue_branch into $prd_branch"
+        log_warn "Please resolve conflicts manually. Current branch: $prd_branch"
+        return 1
+    fi
+    
+    # Delete the issue branch after successful merge
+    git branch -D "$issue_branch" 2>/dev/null || true
+    log_info "Deleted issue branch $issue_branch"
+}
+
+# --- Label Management ---
+
+ensure_label_exists() {
+    local label="$1"
+    
+    if ! gh label list --search "$label" --json name | grep -q "\"$label\""; then
+        log_info "Creating label '$label'..."
+        gh label create "$label" --color "6e5494" --description "Managed by ralph" 2>/dev/null || {
+            log_warn "Failed to create label '$label'. It may already exist."
+        }
+    fi
+}
+
+label_issue() {
+    local issue_number="$1"
+    local label="$2"
+    
+    log_info "Labeling issue #$issue_number as $label..."
+    ensure_label_exists "$label"
+    gh issue edit "$issue_number" --add-label "$label" || true
+}
+
 # --- Local mode functions ---
 
 find_issues_for_prd_local() {
@@ -116,32 +219,6 @@ move_issue() {
     mv "$issue_file" "$dest_dir/$basename"
 }
 
-create_branch() {
-    local branch_name="$1"
-    
-    if git show-ref --verify --quiet "refs/heads/$branch_name"; then
-        log_warn "Branch $branch_name already exists. Skipping."
-        return 1
-    fi
-    
-    git checkout -b "$branch_name"
-    echo "$branch_name"
-}
-
-cleanup_branch() {
-    local branch_name="$1"
-    local original_branch="$2"
-    
-    if git rev-list --count "${original_branch}..${branch_name}" | grep -q "^[1-9]"; then
-        log_info "Pushing branch $branch_name..."
-        git push -u origin "$branch_name" || log_warn "Failed to push branch"
-    else
-        log_info "No commits on $branch_name. Skipping push."
-    fi
-    
-    git checkout "$original_branch"
-}
-
 build_prompt() {
     local issue_number="$1"
     local title="$2"
@@ -184,7 +261,8 @@ run_ai() {
 process_issue_local() {
     local issue_file="$1"
     local prd_file="$2"
-    local original_branch="$3"
+    local prd_branch="$3"
+    local original_branch="$4"
     
     local title
     title=$(get_issue_title "$issue_file")
@@ -200,9 +278,9 @@ process_issue_local() {
     move_issue "$issue_file" "$RALPH_ISSUES_DIR/in-progress"
     issue_file="$RALPH_ISSUES_DIR/in-progress/$(basename "$issue_file")"
     
-    # Create branch
+    # Create branch from PRD branch
     local branch_name="ralph/$issue_name"
-    if ! create_branch "$branch_name"; then
+    if ! create_issue_branch "$branch_name" "$prd_branch"; then
         return 1
     fi
     
@@ -215,8 +293,11 @@ process_issue_local() {
         exit_code=1
     fi
     
-    # Cleanup
-    cleanup_branch "$branch_name" "$original_branch"
+    # Merge issue branch back into PRD branch
+    if ! merge_issue_to_prd "$branch_name" "$prd_branch"; then
+        log_error "Failed to merge $branch_name into $prd_branch"
+        exit_code=1
+    fi
     
     # Move to final state
     if [[ $exit_code -eq 0 ]]; then
@@ -232,8 +313,8 @@ process_issue_local() {
 
 process_next_issue_local() {
     local prd_file="$1"
-    local original_branch
-    original_branch=$(get_original_branch)
+    local prd_branch="$2"
+    local original_branch="$3"
     
     local issues
     issues=$(find_issues_for_prd_local "$prd_file")
@@ -244,7 +325,7 @@ process_next_issue_local() {
     
     while IFS= read -r issue_file; do
         if [[ -n "$issue_file" ]]; then
-            if process_issue_local "$issue_file" "$prd_file" "$original_branch"; then
+            if process_issue_local "$issue_file" "$prd_file" "$prd_branch" "$original_branch"; then
                 return 0
             fi
         fi
@@ -339,24 +420,17 @@ get_next_issue_github() {
     return 1
 }
 
-label_issue() {
-    local issue_number="$1"
-    local label="$2"
-    
-    log_info "Labeling issue #$issue_number as $label..."
-    gh issue edit "$issue_number" --add-label "$label" || true
-}
-
 process_issue_github() {
     local issue_number="$1"
     local title="$2"
     local body="$3"
     local parent_number="$4"
-    local original_branch="$5"
+    local prd_branch="$5"
+    local original_branch="$6"
     
     local branch_name="ralph/issue-${issue_number}"
     
-    if ! create_branch "$branch_name"; then
+    if ! create_issue_branch "$branch_name" "$prd_branch"; then
         return 1
     fi
     
@@ -367,7 +441,11 @@ process_issue_github() {
         exit_code=1
     fi
     
-    cleanup_branch "$branch_name" "$original_branch"
+    # Merge issue branch back into PRD branch
+    if ! merge_issue_to_prd "$branch_name" "$prd_branch"; then
+        log_error "Failed to merge $branch_name into $prd_branch"
+        exit_code=1
+    fi
     
     if [[ $exit_code -eq 0 ]]; then
         label_issue "$issue_number" "ralph-done"
@@ -382,8 +460,8 @@ process_issue_github() {
 
 process_next_issue_github() {
     local parent_number="$1"
-    local original_branch
-    original_branch=$(get_original_branch)
+    local prd_branch="$2"
+    local original_branch="$3"
     
     local issues_json
     issues_json=$(fetch_child_issues "$parent_number")
@@ -411,5 +489,5 @@ process_next_issue_github() {
     
     log_info "Selected issue #$number: $title"
     
-    process_issue_github "$number" "$title" "$body" "$parent_number" "$original_branch"
+    process_issue_github "$number" "$title" "$body" "$parent_number" "$prd_branch" "$original_branch"
 }
