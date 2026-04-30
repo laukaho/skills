@@ -56,7 +56,7 @@ Ralph will:
 4. Create an issue branch from the PRD branch: `ralph/<issue-name>`
 5. Run the configured AI agent with the issue context
 6. Merge the issue branch back into the PRD branch
-7. Push the PRD branch and return to the original branch
+7. For github mode, push the PRD branch and return to the original branch
 8. Move issue to `issues/done/` or `issues/failed/`
 
 For GitHub mode, ralph automatically creates the labels `ralph-in-progress`, `ralph-done`, and `ralph-failed` if they don't already exist in the repo.
