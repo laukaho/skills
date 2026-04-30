@@ -11,7 +11,7 @@ This skill takes the current conversation context and codebase understanding and
 
 ## Mode Detection
 
-Before proceeding, detect the mode:
+Before proceeding, ask user to choose the mode:
 - **Local mode**: If `./prd/` directory exists (or user explicitly requests local), write the PRD to a local markdown file
 - **GitHub mode** (default): If `./prd/` does NOT exist, create a GitHub issue
 

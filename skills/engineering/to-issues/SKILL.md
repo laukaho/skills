@@ -13,7 +13,7 @@ Break a plan into independently-grabbable issues using vertical slices (tracer b
 
 ## Mode Detection
 
-Before proceeding, detect the mode:
+Before proceeding, ask user to choose the mode:
 - **Local mode**: If `./issues/open/` directory exists (or user explicitly requests local), create local markdown files
 - **GitHub mode** (default): If `./issues/open/` does NOT exist, create GitHub issues
 
