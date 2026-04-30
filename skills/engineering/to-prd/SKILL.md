@@ -11,9 +11,20 @@ This skill takes the current conversation context and codebase understanding and
 
 ## Mode Detection
 
-Before proceeding, detect the mode:
-- **Local mode**: If `./prd/` directory exists (or user explicitly requests local), write the PRD to a local markdown file
-- **GitHub mode** (default): If `./prd/` does NOT exist, create a GitHub issue
+Before proceeding, determine the output mode:
+
+1. **Check if mode was already established in this conversation.** If the user has already answered "local" or "github" in a previous turn, use that mode without asking again.
+
+2. **If this is the first time in this conversation:** Ask the user:
+   > "Do you want to save PRDs as local files or GitHub issues? Reply 'local' or 'github'."
+
+   Remember their answer for the rest of this conversation. Do NOT write any files to disk.
+
+3. **If the user explicitly asks to change mode** (e.g. "switch to local mode" or "use github instead"), update your memory for this conversation and use the new mode going forward.
+
+**Modes:**
+- **Local mode**: Save PRD to `./prd/<kebab-case-title>.md`. Ensure the directory exists first.
+- **GitHub mode** (default): Create a GitHub issue via `gh issue create`
 
 ## Process
 

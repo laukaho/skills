@@ -13,9 +13,21 @@ Break a plan into independently-grabbable issues using vertical slices (tracer b
 
 ## Mode Detection
 
-Before proceeding, detect the mode:
-- **Local mode**: If `./issues/open/` directory exists (or user explicitly requests local), create local markdown files
-- **GitHub mode** (default): If `./issues/open/` does NOT exist, create GitHub issues
+Before proceeding, determine the output mode:
+
+1. **Check if mode was already established in this conversation.** If the user has already answered "local" or "github" in a previous turn, use that mode without asking again.
+
+2. **If this is the first time in this conversation:** Ask the user:
+   
+   > "Do you want to save issues as local files or GitHub issues? Reply 'local' or 'github'."
+
+   Remember their answer for the rest of this conversation. Do NOT write any files to disk.
+
+3. **If the user explicitly asks to change mode** (e.g. "switch to local mode" or "use github instead"), update your memory for this conversation and use the new mode going forward.
+
+**Modes:**
+- **Local mode**: Create markdown files in `./issues/open/` (format: `###-<kebab-case-title>.md`). Ensure the directory exists first.
+- **GitHub mode** (default): Create GitHub issues via `gh issue create`
 
 ## Process
 
