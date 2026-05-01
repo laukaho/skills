@@ -8,10 +8,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_info() { echo -e "${BLUE}[INFO]${NC} $1" >&2; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1" >&2; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 
 # Config
 RALPH_ISSUES_DIR="${RALPH_ISSUES_DIR:-./issues}"
@@ -110,40 +110,6 @@ cleanup_prd_branch() {
     git checkout "$original_branch"
 }
 
-# --- Issue Branch Management ---
-
-create_issue_branch() {
-    local branch_name="$1"
-    local prd_branch="$2"
-    
-    if git show-ref --verify --quiet "refs/heads/$branch_name"; then
-        log_warn "Branch $branch_name already exists. Skipping."
-        return 1
-    fi
-    
-    git checkout -b "$branch_name" "$prd_branch"
-    echo "$branch_name"
-}
-
-merge_issue_to_prd() {
-    local issue_branch="$1"
-    local prd_branch="$2"
-    
-    log_info "Merging $issue_branch into $prd_branch..."
-    
-    git checkout "$prd_branch"
-    
-    if ! git merge --no-edit "$issue_branch" 2>/dev/null; then
-        log_warn "Merge conflict when merging $issue_branch into $prd_branch"
-        log_warn "Please resolve conflicts manually. Current branch: $prd_branch"
-        return 1
-    fi
-    
-    # Delete the issue branch after successful merge
-    git branch -D "$issue_branch" 2>/dev/null || true
-    log_info "Deleted issue branch $issue_branch"
-}
-
 # --- Label Management ---
 
 ensure_label_exists() {
@@ -224,11 +190,13 @@ build_prompt() {
     local title="$2"
     local body="$3"
     local parent_ref="$4"
+    local prd_branch="$5"
     
     cat <<EOF
 You are working on issue #${issue_number}: "${title}"
 
 Parent PRD: ${parent_ref}
+Current branch: ${prd_branch}
 
 ## Task
 Implement the feature described below.
@@ -236,7 +204,13 @@ Implement the feature described below.
 ## Context
 ${body}
 
-Please implement this feature. Create commits on the current branch as needed.
+Work directly on this branch (${prd_branch}). Create commits as needed.
+
+If the change is complex, risky, or experimental and you want to isolate it, you may create a temporary branch. If you do:
+1. Create branch from current branch: git checkout -b <branch-name>
+2. Do your work and commit
+3. Merge back: git checkout ${prd_branch} && git merge <branch-name>
+4. Delete the temporary branch: git branch -d <branch-name>
 EOF
 }
 
@@ -245,11 +219,12 @@ run_ai() {
     local title="$2"
     local body="$3"
     local parent_ref="$4"
+    local prd_branch="$5"
     
     log_info "Running $RALPH_AI_RUNNER for issue #$issue_number: $title"
     
     local prompt
-    prompt=$(build_prompt "$issue_number" "$title" "$body" "$parent_ref")
+    prompt=$(build_prompt "$issue_number" "$title" "$body" "$parent_ref" "$prd_branch")
     
     if [[ "$RALPH_AI_RUNNER" == "opencode" ]]; then
         opencode run "$prompt"
@@ -274,32 +249,17 @@ process_issue_local() {
         return 1
     fi
     
-    # Move to in-progress
     move_issue "$issue_file" "$RALPH_ISSUES_DIR/in-progress"
     issue_file="$RALPH_ISSUES_DIR/in-progress/$(basename "$issue_file")"
     
-    # Create branch from PRD branch
-    local branch_name="ralph/$issue_name"
-    if ! create_issue_branch "$branch_name" "$prd_branch"; then
-        return 1
-    fi
-    
-    # Build prompt and run
     local body
     body=$(cat "$issue_file")
     local exit_code=0
     
-    if ! run_ai "$issue_name" "$title" "$body" "$prd_file"; then
+    if ! run_ai "$issue_name" "$title" "$body" "$prd_file" "$prd_branch"; then
         exit_code=1
     fi
     
-    # Merge issue branch back into PRD branch
-    if ! merge_issue_to_prd "$branch_name" "$prd_branch"; then
-        log_error "Failed to merge $branch_name into $prd_branch"
-        exit_code=1
-    fi
-    
-    # Move to final state
     if [[ $exit_code -eq 0 ]]; then
         move_issue "$issue_file" "$RALPH_ISSUES_DIR/done"
         log_success "Issue $issue_name completed"
@@ -371,7 +331,8 @@ fetch_child_issues() {
 is_blocked_github() {
     local issue_body="$1"
     local blocked_refs
-    blocked_refs=$(echo "$issue_body" | grep -oE '#[0-9]+' | sed 's/#//')
+    # Only extract issue numbers from the "Blocked by" section
+    blocked_refs=$(echo "$issue_body" | awk '/^## Blocked by/{found=1; next} /^## /{found=0} found' | grep -oE '#[0-9]+' | sed 's/#//')
     
     if [[ -z "$blocked_refs" ]]; then
         return 1
@@ -390,10 +351,19 @@ is_blocked_github() {
 
 get_next_issue_github() {
     local issues_json="$1"
-    local sorted_issues
-    sorted_issues=$(echo "$issues_json" | jq -s 'sort_by(.number) | .[]')
     
-    while IFS= read -r issue; do
+    local sorted_issues_json
+    sorted_issues_json=$(echo "$issues_json" | jq -c 'sort_by(.number) | .[]')
+    
+    if [[ -z "$sorted_issues_json" ]]; then
+        return 1
+    fi
+    
+    local -a sorted_issues
+    mapfile -t sorted_issues <<< "$sorted_issues_json"
+    
+    local found=1
+    for issue in "${sorted_issues[@]}"; do
         if [[ -z "$issue" ]]; then
             continue
         fi
@@ -414,10 +384,11 @@ get_next_issue_github() {
         fi
         
         echo "$issue"
-        return 0
-    done <<< "$sorted_issues"
+        found=0
+        break
+    done
     
-    return 1
+    return $found
 }
 
 process_issue_github() {
@@ -428,22 +399,10 @@ process_issue_github() {
     local prd_branch="$5"
     local original_branch="$6"
     
-    local branch_name="ralph/issue-${issue_number}"
-    
-    if ! create_issue_branch "$branch_name" "$prd_branch"; then
-        return 1
-    fi
-    
     label_issue "$issue_number" "ralph-in-progress"
     
     local exit_code=0
-    if ! run_ai "$issue_number" "$title" "$body" "$parent_number"; then
-        exit_code=1
-    fi
-    
-    # Merge issue branch back into PRD branch
-    if ! merge_issue_to_prd "$branch_name" "$prd_branch"; then
-        log_error "Failed to merge $branch_name into $prd_branch"
+    if ! run_ai "$issue_number" "$title" "$body" "$parent_number" "$prd_branch"; then
         exit_code=1
     fi
     

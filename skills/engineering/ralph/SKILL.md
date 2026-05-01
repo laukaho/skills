@@ -7,7 +7,7 @@ description: Orchestrate automated issue processing with AI agents (opencode or 
 
 ## Quick start
 
-The shell scripts are bundled with this skill, located in the `scripts/` directory next to this SKILL.md file. Copy them to your repo or run them directly from the skill path.
+The shell scripts are bundled with this skill, located in the `scripts/` directory next to this SKILL.md file. 
 
 **GitHub mode** (issues stored in GitHub):
 ```bash
@@ -52,14 +52,10 @@ The login button is not clickable on mobile.
 Ralph will:
 1. Create (or checkout) a PRD branch: `ralph/prd-<identifier>` from the current branch
 2. Find the first unblocked open issue for that PRD
-3. Move it to `issues/in-progress/`
-4. Create an issue branch from the PRD branch: `ralph/<issue-name>`
-5. Run the configured AI agent with the issue context
-6. Merge the issue branch back into the PRD branch
-7. For github mode, push the PRD branch and return to the original branch
-8. Move issue to `issues/done/` or `issues/failed/`
-
-For GitHub mode, ralph automatically creates the labels `ralph-in-progress`, `ralph-done`, and `ralph-failed` if they don't already exist in the repo.
+3. Move it to `issues/in-progress/`. For github mode, tag or create label `ralph-in-progress`
+4. Run the configured AI agent on the PRD branch (AI may branch out if needed for risky/experimental changes)
+5. For github mode, push the PRD branch and return to the original branch
+6. Move issue to `issues/done/` or `issues/failed/`. For github mode, tag or create label `ralph-done` or `ralph-failed` and clean old ralph label
 
 ### 3. Process all issues
 
@@ -67,7 +63,8 @@ For GitHub mode, ralph automatically creates the labels `ralph-in-progress`, `ra
 ./scripts/ralph-loop.sh prd/001-auth.md
 ```
 
-Runs ralph continuously until no more unblocked issues remain.
+- Runs ralph continuously until no more unblocked issues remain. 
+- DO NOT ask user question until no more unblocked issues remain
 
 ### 4. Use Cursor instead of opencode
 
@@ -98,4 +95,4 @@ Local issues are markdown files with these conventions:
 - Skips blocked issues until their dependencies are done
 - Prevents duplicate branches (`ralph/<issue-name>`)
 - Labels GitHub issues with `ralph-in-progress`, `ralph-done`, `ralph-failed` (auto-creates labels if missing)
-- **Branching strategy**: Creates a PRD branch first (`ralph/prd-<identifier>`), then branches issues from it. Issue branches are merged back into the PRD branch after completion.
+- **Branching strategy**: Creates a PRD branch (`ralph/prd-<identifier>`). Runs AI directly on the PRD branch. AI may branch out for risky/experimental changes if it deems necessary.
