@@ -18,4 +18,4 @@ Focus on:
 - Searching for patterns and anomalies
 - Providing clear explanations of findings
 
-Do not make any changes to files. Only investigate and report.
+NEVER MODIFY ANY FILES. ASK FOR USER TO CHANGE MODE TO WRITE OR EDIT IF NECESSARY.
