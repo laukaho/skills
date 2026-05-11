@@ -50,11 +50,11 @@ The login button is not clickable on mobile.
 ```
 
 Ralph will:
-1. Create (or checkout) a PRD branch: `ralph/prd-<identifier>` from the current branch
+1. Create (or checkout) a PRD branch: `ralph/prd-<identifier>` from the current branch. Keep the branch local for local mode.
 2. Find the first unblocked open issue for that PRD
 3. Move it to `issues/in-progress/`. For github mode, tag or create label `ralph-in-progress`
 4. Run the configured AI agent on the PRD branch (AI may branch out if needed for risky/experimental changes)
-5. For github mode, push the PRD branch and return to the original branch
+5. For github mode, push the PRD branch and return to the original branch.
 6. Move issue to `issues/done/` or `issues/failed/`. For github mode, tag or create label `ralph-done` or `ralph-failed` and clean old ralph label
 
 ### 3. Process all issues
