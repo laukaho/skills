@@ -1,6 +1,6 @@
 ---
 name: ralph
-description: Orchestrate automated issue processing with AI agents (opencode or Cursor). Fetches unblocked child issues from a parent PRD and runs the configured AI agent to implement them, handling branching, commits, and status tracking. Use when user mentions "ralph", "process issues", "work through issues", or wants to automate implementation of PRD child issues. Supports both GitHub Issues and local markdown file workflows.
+description: Orchestrate automated issue processing with Codex or Cursor. Fetches unblocked child issues from a parent PRD and runs the configured AI agent to implement them, handling branching, commits, and status tracking. Use when user mentions "ralph", "process issues", "work through issues", or wants to automate implementation of PRD child issues. Supports both GitHub Issues and local markdown file workflows.
 ---
 
 # Ralph
@@ -66,17 +66,18 @@ Ralph will:
 - Runs ralph continuously until no more unblocked issues remain. 
 - DO NOT ask user question until no more unblocked issues remain
 
-### 4. Use Cursor instead of opencode
+### 4. Choose an AI runner
 
 ```bash
 RALPH_AI_RUNNER=cursor ./scripts/ralph-loop.sh prd/001-auth.md
+RALPH_AI_RUNNER=codex ./scripts/ralph-loop.sh prd/001-auth.md
 ```
 
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RALPH_AI_RUNNER` | `opencode` | AI agent to use: `opencode` or `cursor` |
+| `RALPH_AI_RUNNER` | `codex` | AI agent to use: `codex` or `cursor` |
 | `RALPH_ISSUES_DIR` | `./issues` | Root directory for local issues |
 | `RALPH_PRD_DIR` | `./prd` | Directory for PRD files |
 

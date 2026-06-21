@@ -16,23 +16,23 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 # Config
 RALPH_ISSUES_DIR="${RALPH_ISSUES_DIR:-./issues}"
 RALPH_PRD_DIR="${RALPH_PRD_DIR:-./prd}"
-RALPH_AI_RUNNER="${RALPH_AI_RUNNER:-opencode}"
+RALPH_AI_RUNNER="${RALPH_AI_RUNNER:-codex}"
 
 check_prerequisites() {
     log_info "Checking prerequisites..."
     
-    if [[ "$RALPH_AI_RUNNER" == "opencode" ]]; then
-        if ! command -v opencode &> /dev/null; then
-            log_error "opencode is not installed. Please install it: https://opencode.ai"
-            exit 1
-        fi
-    elif [[ "$RALPH_AI_RUNNER" == "cursor" ]]; then
+    if [[ "$RALPH_AI_RUNNER" == "cursor" ]]; then
         if ! command -v agent &> /dev/null; then
             log_error "Cursor CLI is not installed. Install: curl https://cursor.com/install -fsS | bash"
             exit 1
         fi
+    elif [[ "$RALPH_AI_RUNNER" == "codex" ]]; then
+        if ! command -v codex &> /dev/null; then
+            log_error "Codex CLI is not installed. Install it from https://developers.openai.com/codex/cli"
+            exit 1
+        fi
     else
-        log_error "Unknown AI runner: $RALPH_AI_RUNNER. Use 'opencode' or 'cursor'."
+        log_error "Unknown AI runner: $RALPH_AI_RUNNER. Use 'codex' or 'cursor'."
         exit 1
     fi
     
@@ -226,10 +226,10 @@ run_ai() {
     local prompt
     prompt=$(build_prompt "$issue_number" "$title" "$body" "$parent_ref" "$prd_branch")
     
-    if [[ "$RALPH_AI_RUNNER" == "opencode" ]]; then
-        opencode run "$prompt"
-    elif [[ "$RALPH_AI_RUNNER" == "cursor" ]]; then
+    if [[ "$RALPH_AI_RUNNER" == "cursor" ]]; then
         agent -p "$prompt" --output-format text
+    elif [[ "$RALPH_AI_RUNNER" == "codex" ]]; then
+        printf '%s\n' "$prompt" | codex exec -
     fi
 }
 
