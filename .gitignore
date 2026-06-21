@@ -1,0 +1,43 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+.venv/
+venv/
+
+# Python caches and tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node.js dependencies and caches
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+.cache/
+
+# Microsoft Office lock files
+~$*
